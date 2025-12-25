@@ -193,7 +193,7 @@ export default defineConfig({
                 browser_specific_settings: {
                     gecko: {
                         id: '{e4b27483-2e73-4762-b2ec-8d988a143a40}',
-                        update_url: 'https://killergerbah.github.io/asbplayer/firefox-extension-updates.json',
+                        update_url: 'https://b-tok.github.io/asbplayer/firefox-extension-updates.json',
                     },
                 },
             };
