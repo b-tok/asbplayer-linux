@@ -1,0 +1,9 @@
+{
+  "name": "dev.asbplayer.audio",
+  "description": "asbplayer Native Audio Recording Host",
+  "path": "/home/boris/apps/asbplayer/native-messaging-host/asbplayer_audio_host.py",
+  "type": "stdio",
+  "allowed_extensions": [
+    "{e4b27483-2e73-4762-b2ec-8d988a143a40}"
+  ]
+}
