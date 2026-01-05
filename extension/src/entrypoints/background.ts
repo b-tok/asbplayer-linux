@@ -375,9 +375,18 @@ export default defineBackground(() => {
                 case 'update-last-card':
                 case 'export-card':
                 case 'copy-subtitle-with-dialog':
+                    console.log('[Background] Received command:', command);
                     const postMineAction = postMineActionFromCommand(command);
+                    console.log('[Background] postMineAction:', postMineAction);
                     tabRegistry.publishCommandToVideoElements((videoElement) => {
+                        console.log('[Background] publishCommandToVideoElements callback, videoElement:', {
+                            src: videoElement.src,
+                            tabId: videoElement.tab.id,
+                            synced: videoElement.synced,
+                            subscribed: videoElement.subscribed,
+                        });
                         if (tabs.find((t) => t.id === videoElement.tab.id) === undefined) {
+                            console.log('[Background] Tab not found in active tabs, skipping');
                             return undefined;
                         }
 
@@ -389,6 +398,7 @@ export default defineBackground(() => {
                             },
                             src: videoElement.src,
                         };
+                        console.log('[Background] Sending copy-subtitle command to video element');
                         return extensionToVideoCommand;
                     });
 

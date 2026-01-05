@@ -18,6 +18,7 @@ export default class VideoSelectController {
     private readonly _frame: UiFrame;
     private readonly _settings: SettingsProvider = new SettingsProvider(new ExtensionSettingsStorage());
     private _subtitleFiles?: SubtitleFile[];
+    private readonly _bindingsArrayId: string;
 
     private messageListener?: (
         request: any,
@@ -27,6 +28,13 @@ export default class VideoSelectController {
 
     constructor(bindings: Binding[]) {
         this._bindings = bindings;
+        this._bindingsArrayId = Math.random().toString(36).substring(7);
+        console.log(
+            '[VideoSelect] Constructor called, bindingsArrayId:',
+            this._bindingsArrayId,
+            'initial count:',
+            bindings.length
+        );
         this._frame = new UiFrame(
             async (lang) => `<!DOCTYPE html>
                 <html lang="en">
@@ -48,6 +56,14 @@ export default class VideoSelectController {
     }
 
     bind() {
+        const isParentDocument = window.self === window.top;
+        console.log(
+            '[VideoSelect] bind() called, isParentDocument:',
+            isParentDocument,
+            'bindingsArrayId:',
+            this._bindingsArrayId
+        );
+
         this.messageListener = (
             request: any,
             sender: Browser.runtime.MessageSender,
@@ -64,7 +80,19 @@ export default class VideoSelectController {
                 case 'copy-subtitle':
                 case 'toggle-recording':
                 case 'take-screenshot':
-                    if (this._bindings.find((b) => b.synced) === undefined) {
+                    console.log(
+                        '[VideoSelect] Received',
+                        request.message.command,
+                        'isParentDocument:',
+                        isParentDocument,
+                        'bindingsCount:',
+                        this._bindings.length,
+                        'syncedBinding:',
+                        this._bindings.find((b) => b.synced) !== undefined
+                    );
+                    // Only trigger video select UI if we have bindings but none are synced
+                    // If we have no bindings at all, another frame likely has the video
+                    if (this._bindings.length > 0 && this._bindings.find((b) => b.synced) === undefined) {
                         this._trigger(true);
                     }
                     break;
@@ -100,7 +128,9 @@ export default class VideoSelectController {
             targetSrc,
             hasSubtitleFiles: subtitleFiles !== undefined,
             bindingsCount: this._bindings.length,
+            bindingsArrayId: this._bindingsArrayId,
             frameHidden: this._frame.hidden,
+            bindingsSrcs: this._bindings.map((b) => b.video.src?.substring(0, 50)),
         });
 
         if (targetSrc !== undefined) {

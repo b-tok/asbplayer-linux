@@ -790,23 +790,46 @@ export default class Binding {
                         break;
                     case 'copy-subtitle':
                         const copySubtitleMessage = request.message as CopySubtitleMessage;
+                        const isParentDoc = window.self === window.top;
+                        console.log(
+                            '[binding.ts] copy-subtitle received, synced:',
+                            this._synced,
+                            'subscribed:',
+                            this.subscribed,
+                            'isParentDocument:',
+                            isParentDoc
+                        );
+                        console.log(
+                            '[binding.ts] postMineAction:',
+                            copySubtitleMessage.postMineAction,
+                            'subtitle:',
+                            !!copySubtitleMessage.subtitle
+                        );
+                        console.log('[binding.ts] subtitles count:', this.subtitleController.subtitles.length);
 
                         if (this._synced) {
                             if (
                                 copySubtitleMessage.subtitle !== undefined &&
                                 copySubtitleMessage.surroundingSubtitles !== undefined
                             ) {
+                                console.log('[binding.ts] Using provided subtitle');
                                 this._copySubtitle(copySubtitleMessage);
                             } else if (this.subtitleController.subtitles.length > 0) {
                                 const [subtitle, surroundingSubtitles] = this.subtitleController.currentSubtitle();
+                                console.log('[binding.ts] Using current subtitle:', !!subtitle);
                                 if (subtitle !== null && surroundingSubtitles !== null) {
                                     this._copySubtitle({ ...copySubtitleMessage, subtitle, surroundingSubtitles });
+                                } else {
+                                    console.log('[binding.ts] No current subtitle found');
                                 }
                             } else {
+                                console.log('[binding.ts] No subtitles, calling _toggleRecordingMedia');
                                 this._toggleRecordingMedia(copySubtitleMessage.postMineAction);
                             }
 
                             this.mobileVideoOverlayController.updateModel();
+                        } else {
+                            console.log('[binding.ts] Not synced, ignoring copy-subtitle command');
                         }
                         break;
                     case 'toggle-recording':
@@ -858,6 +881,11 @@ export default class Binding {
                         this.subtitleController.notification('info.error', { message: notifyErrorMessage.message });
                         break;
                     case 'recording-started':
+                        console.log(
+                            '[binding.ts] recording-started received, transitioning from',
+                            this.recordingState,
+                            'to started'
+                        );
                         this.recordingState = RecordingState.started;
                         break;
                     case 'recording-finished':
@@ -1275,7 +1303,16 @@ export default class Binding {
     }
 
     async _toggleRecordingMedia(postMineAction: PostMineAction) {
+        console.log('[binding.ts] _toggleRecordingMedia called, current recordingState:', this.recordingState);
+
         if (this.recordingState === RecordingState.requested) {
+            // Recording was requested but hasn't started yet - just reset state
+            console.log('[binding.ts] Recording still in requested state, resetting to notRecording');
+            this.recordingState = RecordingState.notRecording;
+            this.recordingPostMineAction = undefined;
+            this.wasPlayingBeforeRecordingMedia = undefined;
+            this.recordingMediaWithScreenshot = false;
+            this.recordingMediaStartedTimestamp = undefined;
             return;
         }
 

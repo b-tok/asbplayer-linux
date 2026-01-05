@@ -77,11 +77,30 @@ export default defineContentScript({
                 }
             }
 
+            console.log('[video.content] hasValidVideoSource returning false for video element:', {
+                src: videoElement.src,
+                srcLength: videoElement.src?.length || 0,
+                srcType: typeof videoElement.src,
+                currentSrc: videoElement.currentSrc,
+                childrenCount: videoElement.children.length,
+                readyState: videoElement.readyState,
+                networkState: videoElement.networkState,
+                paused: videoElement.paused,
+                duration: videoElement.duration,
+                inDocument: document.contains(videoElement),
+            });
             return false;
         };
 
         const bind = async () => {
             const bindings: Binding[] = [];
+            const bindingsArrayId = Math.random().toString(36).substring(7);
+            console.log(
+                '[video.content] bind() called, bindingsArrayId:',
+                bindingsArrayId,
+                'isParentDocument:',
+                window.self === window.top
+            );
             const page = await currentPageDelegate();
             let hasPageScript = page?.config.pageScript !== undefined;
             let frameInfoListener: FrameInfoListener | undefined;
@@ -119,6 +138,7 @@ export default defineContentScript({
                         hasValidVideoSource(videoElement, page) &&
                         !page?.shouldIgnore(videoElement)
                     ) {
+                        console.log('[video.content] Adding new binding for video:', videoElement.src);
                         const b = new Binding(videoElement, hasPageScript, frameInfoBroadcaster?.frameId);
                         b.bind();
                         bindings.push(b);
@@ -128,17 +148,28 @@ export default defineContentScript({
                 for (let i = bindings.length - 1; i >= 0; --i) {
                     const b = bindings[i];
                     let videoElementExists = false;
+                    let videoElementInDom = false;
 
                     for (let j = 0; j < videoElements.length; ++j) {
                         const videoElement = videoElements[j];
 
-                        if (videoElement.isSameNode(b.video) && hasValidVideoSource(videoElement, page)) {
-                            videoElementExists = true;
-                            break;
+                        if (videoElement.isSameNode(b.video)) {
+                            videoElementInDom = true;
+                            if (hasValidVideoSource(videoElement, page)) {
+                                videoElementExists = true;
+                                break;
+                            }
                         }
                     }
 
                     if (!videoElementExists) {
+                        console.log('[video.content] Removing binding for video:', {
+                            src: b.video.src,
+                            currentSrc: b.video.currentSrc,
+                            videoElementInDom,
+                            synced: b.synced,
+                            subscribed: b.subscribed,
+                        });
                         bindings.splice(i, 1);
                         b.unbind();
                     }
@@ -153,10 +184,30 @@ export default defineContentScript({
 
             bindToVideoElements();
             const videoInterval = setInterval(bindToVideoElements, 1000);
+
+            // Log bindings state every 5 seconds for debugging
+            setInterval(() => {
+                console.log('[video.content] Current bindings state:', {
+                    bindingsArrayId,
+                    count: bindings.length,
+                    bindings: bindings.map((b) => ({
+                        src: b.video.src?.substring(0, 80) + (b.video.src?.length > 80 ? '...' : ''),
+                        synced: b.synced,
+                        subscribed: b.subscribed,
+                        videoInDocument: document.contains(b.video),
+                    })),
+                });
+            }, 5000);
             const shadowRootInterval = page?.config.searchShadowRootsForVideoElements
                 ? setInterval(incrementallyFindShadowRoots, 100)
                 : undefined;
 
+            console.log(
+                '[video.content] Creating VideoSelectController, isParentDocument:',
+                isParentDocument,
+                'bindingsArrayId:',
+                bindingsArrayId
+            );
             const videoSelectController = new VideoSelectController(bindings);
             videoSelectController.bind();
 

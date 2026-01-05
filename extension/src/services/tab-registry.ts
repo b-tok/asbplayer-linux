@@ -73,10 +73,23 @@ export default class TabRegistry {
 
     private async _fetchVideoElementState(): Promise<{ [key: string]: VideoElement }> {
         const result = await browser.storage.session.get('tabRegistryVideoElements');
-        return (result && (result.tabRegistryVideoElements as { [key: string]: VideoElement })) ?? {};
+        const videoElements = (result && (result.tabRegistryVideoElements as { [key: string]: VideoElement })) ?? {};
+        console.log(
+            '[TabRegistry] _fetchVideoElementState: count =',
+            Object.keys(videoElements).length,
+            'keys =',
+            Object.keys(videoElements)
+        );
+        return videoElements;
     }
 
     private async _saveVideoElementState(state: { [key: string]: VideoElement }) {
+        console.log(
+            '[TabRegistry] _saveVideoElementState: count =',
+            Object.keys(state).length,
+            'keys =',
+            Object.keys(state)
+        );
         await browser.storage.session.set({ tabRegistryVideoElements: state });
     }
 
@@ -322,9 +335,11 @@ export default class TabRegistry {
         }
 
         const tabId = tab.id;
+        const key = `${tab.id}:${src}`;
+        console.log('[TabRegistry] onVideoElementHeartbeat:', { key, subscribed, synced, syncedTimestamp });
 
         await this._videoElements((videoElements) => {
-            videoElements[`${tab.id}:${src}`] = {
+            videoElements[key] = {
                 tab: {
                     id: tabId,
                     title: tab.title ?? '',
@@ -343,14 +358,17 @@ export default class TabRegistry {
     }
 
     async onVideoElementDisappeared(tab: Browser.tabs.Tab, src: string) {
-        await this._videoElements((videoElements) => {
-            const key = `${tab.id}:${src}`;
+        const key = `${tab.id}:${src}`;
+        console.log('[TabRegistry] onVideoElementDisappeared:', key);
 
+        await this._videoElements((videoElements) => {
             if (key in videoElements) {
+                console.log('[TabRegistry] Removing video element:', key);
                 delete videoElements[key];
                 return true;
             }
 
+            console.log('[TabRegistry] Video element not found to remove:', key);
             return false;
         });
     }
@@ -425,6 +443,11 @@ export default class TabRegistry {
         commandFactory: (videoElement: VideoElement) => ExtensionToVideoCommand<T> | undefined
     ) {
         const videoElements = await this._videoElements();
+        console.log(
+            '[TabRegistry] publishCommandToVideoElements, videoElements count:',
+            Object.keys(videoElements).length
+        );
+        console.log('[TabRegistry] videoElements:', JSON.stringify(videoElements, null, 2));
 
         for (const id in videoElements) {
             const videoElement = videoElements[id];
@@ -434,6 +457,7 @@ export default class TabRegistry {
                 const command = commandFactory(videoElement);
 
                 if (command !== undefined) {
+                    console.log('[TabRegistry] Sending command to tab:', tabId, 'src:', videoElement.src);
                     browser.tabs.sendMessage(tabId, command);
                 }
             }
